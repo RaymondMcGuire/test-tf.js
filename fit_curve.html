@@ -1,148 +1,161 @@
 <html>
 
-	<head>
-		<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@0.13.3/dist/tf.min.js"> </script>
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js"> </script>
-		<script src="./scripts/utils.js"> </script>
-	</head>
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@0.13.3/dist/tf.min.js">
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js">
+    </script>
+    <script src="./scripts/lib/utils.js">
+    </script>
+</head>
 
-	<body>
-		<div style="width:75%">
-			<canvas id="chart"></canvas>
-		</div>
+<body>
+    <div style="width:75%">
+        <canvas id="chart"></canvas>
+    </div>
 
-		<script>
-			function generateData(numPoints, coeff, sigma = 0.04) {
-				return tf.tidy(() => {
-					const [a, b, c, d] = [
-						tf.scalar(coeff.a), tf.scalar(coeff.b), tf.scalar(coeff.c),
-						tf.scalar(coeff.d)
-					];
+    <script>
+        function generateData(numPoints, coeff, sigma = 0.04) {
+            return tf.tidy(() => {
+                const [a, b, c, d] = [
+                    tf.scalar(coeff.a), tf.scalar(coeff.b), tf.scalar(coeff.c),
+                    tf.scalar(coeff.d)
+                ];
 
-					const xs = tf.randomUniform([numPoints], -1, 1);
+                const xs = tf.randomUniform([numPoints], -1, 1);
 
-					// Generate polynomial data
-					const three = tf.scalar(3, 'int32');
-					const ys = a.mul(xs.pow(three))
-						.add(b.mul(xs.square()))
-						.add(c.mul(xs))
-						.add(d)
-						// Add random noise to the generated data
-						// to make the problem a bit more interesting
-						.add(tf.randomNormal([numPoints], 0, sigma));
+                // Generate polynomial data
+                const three = tf.scalar(3, 'int32');
+                const ys = a.mul(xs.pow(three))
+                    .add(b.mul(xs.square()))
+                    .add(c.mul(xs))
+                    .add(d)
+                    // Add random noise to the generated data
+                    // to make the problem a bit more interesting
+                    .add(tf.randomNormal([numPoints], 0, sigma));
 
-					// Normalize the y values to the range 0 to 1.
-					const ymin = ys.min();
-					const ymax = ys.max();
-					const yrange = ymax.sub(ymin);
-					const ysNormalized = ys.sub(ymin).div(yrange);
+                // Normalize the y values to the range 0 to 1.
+                const ymin = ys.min();
+                const ymax = ys.max();
+                const yrange = ymax.sub(ymin);
+                const ysNormalized = ys.sub(ymin).div(yrange);
 
-					return {
-						xs,
-						ys: ysNormalized
-					};
-				})
-			};
+                return {
+                    xs,
+                    ys: ysNormalized
+                };
+            })
+        };
 
-			const trueCoefficients = { a: -.8, b: -.2, c: .9, d: .5 };
-			const trainingData = generateData(100, trueCoefficients);
-			const a = tf.variable(tf.scalar(Math.random()));
-			const b = tf.variable(tf.scalar(Math.random()));
-			const c = tf.variable(tf.scalar(Math.random()));
-			const d = tf.variable(tf.scalar(Math.random()));
-
-
-			async function plotData(ctx, xs, ys) {
-				const yValue = await ys.data();
-				const xValue = await xs.data();
-				const ds = Array.from(yValue).map((y, i) => {
-					return { 'x': xValue[i], 'y': yValue[i] };
-				});
-				var color = Chart.helpers.color;
-				var scatterChartData = {
-					datasets: [{
-						label: 'Original Data',
-						borderColor: window.chartColors.red,
-						backgroundColor: color(window.chartColors.red).alpha(0.2).rgbString(),
-						data: ds
-					}]
-				};
-
-				window.myScatter = new Chart(ctx, {
-					type: 'scatter',
-					data: scatterChartData,
-					options: {
-						title: {
-							display: true,
-							text: 'Fitting a curve to synthetic data'
-						},
-					}
-				});
-			}
-
-			async function plotPredictData(xs, pred) {
-				const pValue = await pred.data();
-				const xValue = await xs.data();
-				const ds = Array.from(pValue).map((y, i) => {
-					return { 'x': xValue[i], 'y': pValue[i] };
-				});
-				
-				window.myScatter.data.datasets.push({
-					  label: 'Predict Data',
-						data: ds,
-						borderColor: window.chartColors.blue,
-						type:'line',
-						fill:false
-				});
-
-				window.myScatter.update();
-			}
-
-			const numIterations = 75;
-			const learningRate = 0.5;
-			const optimizer = tf.train.sgd(learningRate);
-
-			function predict(x) {
-				// y = a * x ^ 3 + b * x ^ 2 + c * x + d
-				return tf.tidy(() => {
-					return a.mul(x.pow(tf.scalar(3, 'int32')))
-						.add(b.mul(x.square()))
-						.add(c.mul(x))
-						.add(d);
-				});
-			}
-
-			function loss(prediction, labels) {
-				const error = prediction.sub(labels).square().mean();
-				return error;
-			}
-
-			async function train(xs, ys, numIterations) {
-				for (let iter = 0; iter < numIterations; iter++) {
-
-					optimizer.minimize(() => {
-						const pred = predict(xs);
-						return loss(pred, ys);
-					});
-
-					await tf.nextFrame();
-				}
-			}
+        const trueCoefficients = {
+            a: -.8,
+            b: -.2,
+            c: .9,
+            d: .5
+        };
+        const trainingData = generateData(100, trueCoefficients);
+        const a = tf.variable(tf.scalar(Math.random()));
+        const b = tf.variable(tf.scalar(Math.random()));
+        const c = tf.variable(tf.scalar(Math.random()));
+        const d = tf.variable(tf.scalar(Math.random()));
 
 
-			window.onload = async function () {
-				var ctx = document.getElementById('chart').getContext('2d');
-				await plotData(ctx, trainingData.xs, trainingData.ys);
-				//console.log(a.dataSync()[0], b.dataSync()[0], c.dataSync()[0], d.dataSync()[0]);
-				await train(trainingData.xs, trainingData.ys, numIterations);
-				//console.log(a.dataSync()[0], b.dataSync()[0], c.dataSync()[0], d.dataSync()[0]);
-				const predictionsAfter = predict(trainingData.xs);
-				await plotPredictData(trainingData.xs,predictionsAfter)
+        async function plotData(ctx, xs, ys) {
+            const yValue = await ys.data();
+            const xValue = await xs.data();
+            const ds = Array.from(yValue).map((y, i) => {
+                return {
+                    'x': xValue[i],
+                    'y': yValue[i]
+                };
+            });
+            var color = Chart.helpers.color;
+            var scatterChartData = {
+                datasets: [{
+                    label: 'Original Data',
+                    borderColor: window.chartColors.red,
+                    backgroundColor: color(window.chartColors.red).alpha(0.2).rgbString(),
+                    data: ds
+                }]
+            };
 
-				predictionsAfter.dispose();
-			};
+            window.myScatter = new Chart(ctx, {
+                type: 'scatter',
+                data: scatterChartData,
+                options: {
+                    title: {
+                        display: true,
+                        text: 'Fitting a curve to synthetic data'
+                    },
+                }
+            });
+        }
 
-		</script>
-	</body>
+        async function plotPredictData(xs, pred) {
+            const pValue = await pred.data();
+            const xValue = await xs.data();
+            const ds = Array.from(pValue).map((y, i) => {
+                return {
+                    'x': xValue[i],
+                    'y': pValue[i]
+                };
+            });
+
+            window.myScatter.data.datasets.push({
+                label: 'Predict Data',
+                data: ds,
+                borderColor: window.chartColors.blue,
+                type: 'line',
+                fill: false
+            });
+
+            window.myScatter.update();
+        }
+
+        const numIterations = 75;
+        const learningRate = 0.5;
+        const optimizer = tf.train.sgd(learningRate);
+
+        function predict(x) {
+            // y = a * x ^ 3 + b * x ^ 2 + c * x + d
+            return tf.tidy(() => {
+                return a.mul(x.pow(tf.scalar(3, 'int32')))
+                    .add(b.mul(x.square()))
+                    .add(c.mul(x))
+                    .add(d);
+            });
+        }
+
+        function loss(prediction, labels) {
+            const error = prediction.sub(labels).square().mean();
+            return error;
+        }
+
+        async function train(xs, ys, numIterations) {
+            for (let iter = 0; iter < numIterations; iter++) {
+
+                optimizer.minimize(() => {
+                    const pred = predict(xs);
+                    return loss(pred, ys);
+                });
+
+                await tf.nextFrame();
+            }
+        }
+
+
+        window.onload = async function() {
+            var ctx = document.getElementById('chart').getContext('2d');
+            await plotData(ctx, trainingData.xs, trainingData.ys);
+            //console.log(a.dataSync()[0], b.dataSync()[0], c.dataSync()[0], d.dataSync()[0]);
+            await train(trainingData.xs, trainingData.ys, numIterations);
+            //console.log(a.dataSync()[0], b.dataSync()[0], c.dataSync()[0], d.dataSync()[0]);
+            const predictionsAfter = predict(trainingData.xs);
+            await plotPredictData(trainingData.xs, predictionsAfter)
+
+            predictionsAfter.dispose();
+        };
+    </script>
+</body>
 
 </html>

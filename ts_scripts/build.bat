@@ -1,0 +1,1 @@
+tsc --out ../scripts/main.js main.ts --lib es6,dom
